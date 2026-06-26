@@ -5,7 +5,7 @@
 ### Advanced Fraud Detection Platform for Financial Transactions
 
 <p align="center">
-  <img src="banner.png" alt="AEGIS Banner" width="100%"/>
+  <img src="banner.svg" alt="AEGIS Banner" width="100%"/>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

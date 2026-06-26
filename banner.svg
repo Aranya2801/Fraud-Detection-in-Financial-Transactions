@@ -1,0 +1,147 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#080b14;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#0d1122;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0c0820;stop-opacity:1" />
+    </linearGradient>
+    <!-- Shield gradient -->
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Text glow -->
+    <filter id="textGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(139,92,246,0.06)" stroke-width="1"/>
+    </pattern>
+    <!-- Radial glow -->
+    <radialGradient id="radialGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.15" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bg)"/>
+  <rect width="1200" height="300" fill="url(#grid)"/>
+  <ellipse cx="600" cy="150" rx="500" ry="200" fill="url(#radialGlow)"/>
+
+  <!-- Animated particle dots -->
+  <circle cx="120" cy="60" r="2" fill="#7c3aed" opacity="0.5"/>
+  <circle cx="250" cy="180" r="1.5" fill="#6366f1" opacity="0.4"/>
+  <circle cx="980" cy="80" r="2" fill="#8b5cf6" opacity="0.6"/>
+  <circle cx="1080" cy="200" r="1.5" fill="#7c3aed" opacity="0.4"/>
+  <circle cx="400" cy="40" r="1" fill="#a78bfa" opacity="0.5"/>
+  <circle cx="800" cy="260" r="2" fill="#6366f1" opacity="0.3"/>
+  <circle cx="150" cy="240" r="1.5" fill="#8b5cf6" opacity="0.4"/>
+  <circle cx="1050" cy="140" r="1" fill="#7c3aed" opacity="0.5"/>
+
+  <!-- Connection lines (suggesting network graph) -->
+  <line x1="120" y1="60" x2="250" y2="180" stroke="rgba(139,92,246,0.15)" stroke-width="1"/>
+  <line x1="250" y1="180" x2="400" y2="40" stroke="rgba(99,102,241,0.12)" stroke-width="1"/>
+  <line x1="980" y1="80" x2="1080" y2="200" stroke="rgba(139,92,246,0.15)" stroke-width="1"/>
+  <line x1="800" y1="260" x2="1050" y2="140" stroke="rgba(99,102,241,0.1)" stroke-width="1"/>
+
+  <!-- Shield icon (left side) -->
+  <g transform="translate(110, 100)" filter="url(#glow)">
+    <path d="M40 0 L80 15 L80 45 C80 65 62 82 40 90 C18 82 0 65 0 45 L0 15 Z"
+          fill="url(#shieldGrad)" opacity="0.9"/>
+    <!-- Checkmark inside shield -->
+    <path d="M25 45 L35 55 L55 35" stroke="white" stroke-width="4"
+          fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+    <!-- Shield border -->
+    <path d="M40 4 L76 17 L76 45 C76 63 59 79 40 86 C21 79 4 63 4 45 L4 17 Z"
+          fill="none" stroke="rgba(167,139,250,0.4)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Main Title -->
+  <text x="230" y="130" font-family="'SF Pro Display', 'Inter', 'Helvetica Neue', sans-serif"
+        font-size="52" font-weight="700" letter-spacing="-1"
+        fill="white" filter="url(#textGlow)">FraudShield AI</text>
+
+  <!-- Subtitle -->
+  <text x="231" y="168" font-family="'SF Pro Text', 'Inter', 'Helvetica Neue', sans-serif"
+        font-size="18" font-weight="400" letter-spacing="0.5"
+        fill="rgba(148,163,184,0.9)">Real-Time Financial Fraud Detection Platform</text>
+
+  <!-- Divider line -->
+  <line x1="231" y1="185" x2="900" y2="185" stroke="rgba(139,92,246,0.25)" stroke-width="1"/>
+
+  <!-- Tech badges row -->
+  <!-- XGBoost badge -->
+  <rect x="231" y="200" width="88" height="22" rx="11" fill="rgba(124,58,237,0.2)" stroke="rgba(124,58,237,0.4)" stroke-width="1"/>
+  <text x="275" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#a78bfa" text-anchor="middle">XGBoost</text>
+
+  <!-- GNN badge -->
+  <rect x="327" y="200" width="68" height="22" rx="11" fill="rgba(99,102,241,0.2)" stroke="rgba(99,102,241,0.4)" stroke-width="1"/>
+  <text x="361" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#818cf8" text-anchor="middle">GNN</text>
+
+  <!-- Kafka badge -->
+  <rect x="403" y="200" width="68" height="22" rx="11" fill="rgba(79,70,229,0.2)" stroke="rgba(79,70,229,0.4)" stroke-width="1"/>
+  <text x="437" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#a5b4fc" text-anchor="middle">Kafka</text>
+
+  <!-- FastAPI badge -->
+  <rect x="479" y="200" width="72" height="22" rx="11" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.35)" stroke-width="1"/>
+  <text x="515" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#34d399" text-anchor="middle">FastAPI</text>
+
+  <!-- Next.js badge -->
+  <rect x="559" y="200" width="68" height="22" rx="11" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <text x="593" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#e2e8f0" text-anchor="middle">Next.js</text>
+
+  <!-- K8s badge -->
+  <rect x="635" y="200" width="92" height="22" rx="11" fill="rgba(50,108,229,0.2)" stroke="rgba(50,108,229,0.4)" stroke-width="1"/>
+  <text x="681" y="215" font-family="Inter, sans-serif" font-size="11" font-weight="600"
+        fill="#93c5fd" text-anchor="middle">Kubernetes</text>
+
+  <!-- Right side — Key metrics -->
+  <g transform="translate(900, 80)">
+    <!-- AUC-ROC -->
+    <rect x="0" y="0" width="140" height="50" rx="8"
+          fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+    <text x="12" y="20" font-family="Inter, sans-serif" font-size="10"
+          fill="rgba(148,163,184,0.7)">AUC-ROC Score</text>
+    <text x="12" y="40" font-family="'SF Mono', 'JetBrains Mono', monospace"
+          font-size="22" font-weight="700" fill="#34d399">0.9847</text>
+
+    <!-- Latency -->
+    <rect x="0" y="60" width="140" height="50" rx="8"
+          fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.2)" stroke-width="1"/>
+    <text x="12" y="80" font-family="Inter, sans-serif" font-size="10"
+          fill="rgba(148,163,184,0.7)">p99 Latency</text>
+    <text x="12" y="100" font-family="'SF Mono', 'JetBrains Mono', monospace"
+          font-size="22" font-weight="700" fill="#a78bfa">&lt; 8ms</text>
+
+    <!-- TPS -->
+    <rect x="0" y="120" width="140" height="50" rx="8"
+          fill="rgba(59,130,246,0.08)" stroke="rgba(59,130,246,0.2)" stroke-width="1"/>
+    <text x="12" y="140" font-family="Inter, sans-serif" font-size="10"
+          fill="rgba(148,163,184,0.7)">Throughput</text>
+    <text x="12" y="160" font-family="'SF Mono', 'JetBrains Mono', monospace"
+          font-size="22" font-weight="700" fill="#60a5fa">500K TPS</text>
+  </g>
+
+  <!-- Bottom border accent -->
+  <rect x="0" y="295" width="1200" height="5" fill="url(#shieldGrad)" opacity="0.6"/>
+</svg>

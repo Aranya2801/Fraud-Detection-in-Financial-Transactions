@@ -1,0 +1,474 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AEGIS Fraud Detection Platform — Docker Compose
+# Starts all services: backend, frontend, databases, streaming, monitoring
+# ══════════════════════════════════════════════════════════════════════════════
+
+networks:
+  aegis-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+  neo4j_data:
+  minio_data:
+  mlflow_data:
+  grafana_data:
+  prometheus_data:
+  elasticsearch_data:
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+x-common-env: &common-env
+  TZ: UTC
+  PYTHONUNBUFFERED: "1"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegis-postgres
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      POSTGRES_DB: aegis_fraud
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis_secret
+      POSTGRES_MAX_CONNECTIONS: "200"
+      POSTGRES_SHARED_BUFFERS: "256MB"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis_fraud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aegis-redis
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - redis_data:/data
+      - ./deployment/docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  # ── Zookeeper ───────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: aegis-zookeeper
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_MAX_CLIENT_CNXNS: 200
+    logging: *default-logging
+
+  # ── Apache Kafka ─────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: aegis-kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_started
+    networks:
+      - aegis-network
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 12
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    logging: *default-logging
+
+  # ── Kafka UI ─────────────────────────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: aegis-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    networks:
+      - aegis-network
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: aegis-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    logging: *default-logging
+
+  # ── Neo4j Graph Database ─────────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:5.18-community
+    container_name: aegis-neo4j
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - neo4j_data:/data
+      - ./deployment/docker/neo4j/plugins:/plugins
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/neo4j_password
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 2G
+      NEO4J_dbms_memory_pagecache_size: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    logging: *default-logging
+
+  # ── MinIO (Object Storage) ────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: aegis-minio
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: aegis_minio
+      MINIO_ROOT_PASSWORD: aegis_minio_secret
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging: *default-logging
+
+  # ── MLflow Tracking Server ────────────────────────────────────────────────────
+  mlflow:
+    image: python:3.11-slim
+    container_name: aegis-mlflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - aegis-network
+    volumes:
+      - mlflow_data:/mlflow
+      - ./requirements-mlflow.txt:/requirements.txt
+    ports:
+      - "5000:5000"
+    environment:
+      <<: *common-env
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: aegis_minio
+      AWS_SECRET_ACCESS_KEY: aegis_minio_secret
+    command: >
+      sh -c "pip install mlflow psycopg2-binary boto3 -q &&
+             mlflow server
+             --backend-store-uri postgresql://aegis:aegis_secret@postgres:5432/aegis_fraud
+             --default-artifact-root s3://mlflow/
+             --host 0.0.0.0
+             --port 5000
+             --workers 4"
+    logging: *default-logging
+
+  # ── Prometheus ────────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: aegis-prometheus
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - prometheus_data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts/:/etc/prometheus/alerts/:ro
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    logging: *default-logging
+
+  # ── Grafana ───────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.3.0
+    container_name: aegis-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - aegis-network
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: aegis_admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fraud_overview.json
+      GF_FEATURE_TOGGLES_ENABLE: "ngalert"
+    logging: *default-logging
+
+  # ── FastAPI Backend ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: aegis-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - aegis-network
+    volumes:
+      - ./ml/registry:/app/ml/registry:ro
+      - ./datasets/processed:/app/datasets/processed:ro
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
+      ENVIRONMENT: production
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: aegis
+      DB_PASSWORD: aegis_secret
+      DB_NAME: aegis_fraud
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: neo4j_password
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-min-32chars}
+      CORS_ORIGINS: '["http://localhost:3000","https://app.aegis-fraud.ai"]'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+    logging: *default-logging
+
+  # ── Celery Worker ────────────────────────────────────────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: aegis-celery-worker
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - aegis-network
+    environment:
+      <<: *common-env
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    command: >
+      celery -A app.core.celery_app worker
+      --loglevel=info
+      --concurrency=8
+      --queues=fraud_analysis,alerts,model_training
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+    logging: *default-logging
+
+  # ── Celery Beat (Scheduler) ──────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: aegis-celery-beat
+    restart: unless-stopped
+    depends_on:
+      - celery-worker
+    networks:
+      - aegis-network
+    environment:
+      <<: *common-env
+      REDIS_HOST: redis
+      CELERY_BROKER_URL: redis://redis:6379/1
+    command: >
+      celery -A app.core.celery_app beat
+      --loglevel=info
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    logging: *default-logging
+
+  # ── Streaming Consumer ────────────────────────────────────────────────────────
+  streaming-consumer:
+    build:
+      context: ./streaming
+      dockerfile: Dockerfile
+    container_name: aegis-streaming
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aegis-network
+    environment:
+      <<: *common-env
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      BATCH_SIZE: "100"
+      MAX_WORKERS: "8"
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+    logging: *default-logging
+
+  # ── Next.js Frontend ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_WS_URL: ws://localhost:8000
+    container_name: aegis-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aegis-network
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_WS_URL: ws://backend:8000
+    logging: *default-logging
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: aegis-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - aegis-network
+    volumes:
+      - ./deployment/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deployment/docker/nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    logging: *default-logging
+
+  # ── Elasticsearch (for audit log search) ─────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: aegis-elasticsearch
+    restart: unless-stopped
+    networks:
+      - aegis-network
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    logging: *default-logging
